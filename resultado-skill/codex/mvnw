@@ -1,0 +1,21 @@
+#!/bin/sh
+# Local only-script Maven bootstrap; no wrapper JAR required.
+set -eu
+BASE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+URL=$(sed -n 's/^distributionUrl=//p' "$BASE/.mvn/wrapper/maven-wrapper.properties" | tr -d '\r')
+NAME=${URL##*/}
+DIST=${NAME%-bin.zip}
+CACHE="$BASE/.mvn/distributions"
+MAVEN="$CACHE/$DIST/bin/mvn"
+if [ ! -x "$MAVEN" ]; then
+  mkdir -p "$CACHE"
+  TEMP=$(mktemp -d "$CACHE/download.XXXXXX")
+  trap 'rm -rf "$TEMP"' EXIT HUP INT TERM
+  curl -fL --connect-timeout 15 --max-time 180 "$URL" -o "$TEMP/$NAME"
+  curl -fL --connect-timeout 15 --max-time 60 "$URL.sha512" -o "$TEMP/checksum"
+  HASH=$(awk '{print $1}' "$TEMP/checksum")
+  (cd "$TEMP" && printf '%s  %s\n' "$HASH" "$NAME" | sha512sum -c -)
+  unzip -q "$TEMP/$NAME" -d "$TEMP"
+  mv "$TEMP/$DIST" "$CACHE/$DIST"
+fi
+exec "$MAVEN" "-Dmaven.repo.local=$BASE/.mvn/distributions/repository" "$@"

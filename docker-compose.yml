@@ -1,0 +1,134 @@
+services:
+  localstack:
+    image: localstack/localstack:3.7
+    container_name: skill-localstack
+    environment:
+      - SERVICES=sns,sqs
+      - AWS_DEFAULT_REGION=sa-east-1
+      - DEBUG=1
+    volumes:
+      - ./docker/localstack/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:4566/_localstack/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.8.0
+    container_name: skill-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.8.0
+    container_name: skill-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://0.0.0.0:9092,SSL://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092,SSL://kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,SSL:SSL
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SSL_KEYSTORE_FILENAME: kafka.server.keystore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: kafka.keystore.pwd
+      KAFKA_SSL_KEY_CREDENTIALS: kafka.keystore.pwd
+      KAFKA_SSL_TRUSTSTORE_FILENAME: kafka.server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: kafka.truststore.pwd
+      KAFKA_SSL_CLIENT_AUTH: none
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      KAFKA_LOG_DIRS: /tmp/kafka-logs
+    volumes:
+      - ./docker/kafka/certs/kafka.server.keystore.jks:/etc/kafka/secrets/kafka.server.keystore.jks:ro
+      - ./docker/kafka/certs/kafka.server.truststore.jks:/etc/kafka/secrets/kafka.server.truststore.jks:ro
+      - ./docker/kafka/secrets/kafka.keystore.pwd:/etc/kafka/secrets/kafka.keystore.pwd:ro
+      - ./docker/kafka/secrets/kafka.truststore.pwd:/etc/kafka/secrets/kafka.truststore.pwd:ro
+      - ./docker/kafka/scripts/create-topics.sh:/create-topics.sh:ro
+    command:
+      - /bin/bash
+      - -c
+      - |
+        rm -rf /tmp/kafka-logs/*
+        /etc/confluent/docker/run &
+        sleep 25
+        chmod +x /create-topics.sh
+        /create-topics.sh
+        wait
+    healthcheck:
+      test: [ "CMD", "kafka-broker-api-versions", "--bootstrap-server", "kafka:29092" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.8.0
+    container_name: skill-schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/app/Dockerfile
+    container_name: skill-app
+    depends_on:
+      localstack:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/actuator/health" ]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+    environment:
+      - SPRING_APPLICATION_NAME=java-spring-skill
+      - SERVER_PORT=8080
+      - APP_AWS_REGION=us-east-1
+      - APP_AWS_ENVIRONMENT=local
+      - SNS_TOPIC_ARN=arn:aws:sns:us-east-1:000000000000:skill-topic
+      - SQS_QUEUE_URL=http://localstack:4566/000000000000/skill-queue
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_SSL_BOOTSTRAP_SERVERS=kafka:9093
+      - KAFKA_SSL_SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - KAFKA_SSL_TRUSTSTORE_PASSWORD=changeit
+      - VIACEP_BASEURL=https://viacep.com.br
+      - API_CLIENT_RETRY_ATTEMPTS=3
+      - API_CLIENT_RETRY_BACKOFF_DELAY_MILLIS=1000
+
+  tester:
+    build:
+      context: .
+      dockerfile: docker/test/Dockerfile
+    container_name: skill-tester
+    profiles:
+      - test
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      - REPORT_PATH=/reports/report.html
+    volumes:
+      - ./docker/test/reports:/reports

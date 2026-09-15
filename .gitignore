@@ -1,0 +1,43 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### Docker / Kafka certs ###
+docker/kafka/certs/*.jks
+docker/kafka/certs/*.p12
+docker/kafka/certs/*.key
+docker/kafka/certs/*.srl
+docker/kafka/certs/server-csr
+docker/kafka/certs/server-cert
+docker/kafka/secrets/*.pwd
+
+### VS Code ###
+.vscode/
+/.mvn/

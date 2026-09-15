@@ -1,0 +1,1 @@
+{"type":"record","name":"PedidoEvento","namespace":"br.com.exemplo.pedidos.avro","fields":[{"name":"pedidoId","type":"string"},{"name":"status","type":"string"}]}

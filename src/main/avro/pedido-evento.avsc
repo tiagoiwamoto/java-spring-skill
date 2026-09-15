@@ -1,0 +1,29 @@
+{
+  "type": "record",
+  "name": "PedidoEvento",
+  "namespace": "br.com.exemplo.pedidos.avro",
+  "doc": "Evento de pedido publicado no modo SSL com Avro e Schema Registry. O schema deve ser registrado previamente no Schema Registry (auto.register.schemas=false, use.latest.version=true).",
+  "fields": [
+    {
+      "name": "pedidoId",
+      "type": "string",
+      "doc": "Identificador do pedido."
+    },
+    {
+      "name": "tipo",
+      "type": "string",
+      "doc": "Tipo do evento, por exemplo CRIADO, CONFIRMADO, CANCELADO."
+    },
+    {
+      "name": "ocorridoEm",
+      "type": "long",
+      "doc": "Instante do evento em epoch millis."
+    },
+    {
+      "name": "detalhe",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Detalhe opcional do evento."
+    }
+  ]
+}

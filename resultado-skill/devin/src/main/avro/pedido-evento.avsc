@@ -1,0 +1,12 @@
+{
+  "type": "record",
+  "name": "PedidoEvento",
+  "namespace": "br.com.exemplo.pedidos.avro",
+  "doc": "Evento de pedido publicado no modo SSL com Avro e Schema Registry.",
+  "fields": [
+    { "name": "pedidoId", "type": "string" },
+    { "name": "tipoEvento", "type": "string" },
+    { "name": "detalhe", "type": ["null", "string"], "default": null },
+    { "name": "ocorridoEm", "type": "string", "doc": "Instante ISO-8601 (UTC) da ocorrencia do evento." }
+  ]
+}
